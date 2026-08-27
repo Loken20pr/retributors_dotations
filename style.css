@@ -1,0 +1,495 @@
+:root {
+    --term-color: #33ff00;          /* Vert phosphore classique */
+    --term-bg: #051405;             /* Noir/Vert tres sombre */
+    --term-warn: #ffb000;           /* Ambre : entrees hors portee */
+    --term-alert: #ff3b3b;          /* Rouge : erreurs */
+    --term-dim: rgba(51, 255, 0, 0.55);
+    --glow: 0 0 10px rgba(51, 255, 0, 0.5);
+    --glow-warn: 0 0 10px rgba(255, 176, 0, 0.4);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--term-bg);
+    color: var(--term-color);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+    line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+    padding: 20px;
+    text-shadow: var(--glow);
+}
+
+.center {
+    text-align: center;
+}
+
+/* Effet ecran cathodique (CRT) */
+.crt::before {
+    content: " ";
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    z-index: 2;
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+}
+
+.terminal {
+    max-width: 1400px;
+    margin: 0 auto;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+h1, h2, h3, h4 {
+    text-transform: uppercase;
+    font-weight: normal;
+    margin-bottom: 10px;
+}
+
+h1 { font-size: 1.5em; }
+h2 { font-size: 1.25em; }
+h3 { font-size: 1.05em; }
+h4 { font-size: 0.95em; }
+
+.separator {
+    color: var(--term-color);
+    margin: 10px 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+button {
+    background: none;
+    border: 1px solid var(--term-color);
+    color: var(--term-color);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 5px 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: var(--glow);
+    transition: all 0.2s;
+}
+
+button:hover, button.active {
+    background: var(--term-color);
+    color: var(--term-bg);
+    text-shadow: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--term-color);
+    outline-offset: 2px;
+}
+
+main {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px 0;
+}
+
+a {
+    color: var(--term-color);
+}
+
+/* Scrollbar personnalisee */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--term-bg); }
+::-webkit-scrollbar-thumb { background: var(--term-color); }
+
+/* ======================================================================
+   CHAMPS ET CASES A COCHER (style terminal)
+   ====================================================================== */
+.champ {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--term-color);
+    color: var(--term-color);
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 6px 8px;
+    outline: none;
+    text-shadow: var(--glow);
+}
+
+.champ::placeholder {
+    color: var(--term-dim);
+}
+
+.champ:focus {
+    background: rgba(51, 255, 0, 0.08);
+    box-shadow: var(--glow);
+}
+
+select.champ option {
+    background: var(--term-bg);
+    color: var(--term-color);
+}
+
+.chk {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    cursor: pointer;
+    padding: 2px 0;
+    line-height: 1.4;
+}
+
+.chk input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.chk .box::before {
+    content: "[ ]";
+    white-space: pre;
+}
+
+.chk input:checked + .box::before {
+    content: "[X]";
+}
+
+.chk:hover {
+    background: rgba(51, 255, 0, 0.08);
+}
+
+.chk input:focus-visible + .box {
+    outline: 1px solid var(--term-color);
+}
+
+.btn-mini {
+    padding: 3px 8px;
+    font-size: 0.8em;
+    box-shadow: none;
+}
+
+/* ======================================================================
+   REGISTRE DES DOTATIONS
+   ====================================================================== */
+.dot-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 25px;
+    align-items: start;
+}
+
+.dot-filters {
+    border: 1px solid var(--term-color);
+    padding: 12px;
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 230px);
+    overflow-y: auto;
+    background: var(--term-bg);
+}
+
+.filtre-groupe {
+    margin-bottom: 18px;
+}
+
+.filtre-groupe:last-child {
+    margin-bottom: 0;
+}
+
+.filtre-groupe h3 {
+    border-bottom: 1px dashed var(--term-color);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+.filtre-groupe .champ {
+    margin-bottom: 6px;
+}
+
+.filtre-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.dot-intro {
+    margin-bottom: 8px;
+}
+
+.dot-note {
+    border-left: 2px solid var(--term-color);
+    padding-left: 10px;
+    margin-bottom: 16px;
+    font-size: 0.9em;
+    color: var(--term-dim);
+    text-shadow: none;
+}
+
+.liste-simple, .legende {
+    list-style: none;
+    padding-left: 0;
+}
+
+.liste-simple li::before {
+    content: "> ";
+}
+
+.liste-simple li, .legende li {
+    margin-bottom: 4px;
+}
+
+/* --- Blocs de role --- */
+.role-bloc {
+    border: 1px solid var(--term-color);
+    padding: 12px 15px;
+    margin-bottom: 20px;
+}
+
+.role-bloc--commun {
+    border-style: double;
+}
+
+.role-bloc > h3 {
+    border-bottom: 1px solid var(--term-color);
+    padding-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.section-bloc {
+    margin-top: 14px;
+}
+
+.section-bloc h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.compteur {
+    font-size: 0.75em;
+    color: var(--term-dim);
+    text-shadow: none;
+    white-space: nowrap;
+}
+
+.compteur-global {
+    margin-bottom: 10px;
+    color: var(--term-dim);
+    text-shadow: none;
+}
+
+.items {
+    list-style: none;
+    padding-left: 14px;
+}
+
+.item {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 1px 0;
+}
+
+.item .chk {
+    flex: 0 1 auto;
+}
+
+.item-note {
+    flex-basis: 100%;
+    padding-left: 32px;
+    font-size: 0.85em;
+    color: var(--term-dim);
+    text-shadow: none;
+}
+
+/* Entree hors de portee de l'autorite selectionnee : phosphore ambre */
+.item--verrou {
+    color: var(--term-warn);
+    text-shadow: var(--glow-warn);
+    opacity: 0.75;
+}
+
+.item--verrou .chk:hover {
+    background: rgba(255, 176, 0, 0.1);
+}
+
+.auth {
+    font-size: 0.75em;
+    border: 1px solid currentColor;
+    padding: 0 5px;
+    white-space: nowrap;
+    text-shadow: none;
+}
+
+.auth--verrou::after {
+    content: " [VERROUILLÉ]";
+}
+
+/* --- Tags de type de dotation --- */
+.tag {
+    display: inline-block;
+    border: 1px solid var(--term-color);
+    padding: 0 5px;
+    font-size: 0.7em;
+    letter-spacing: 1px;
+    vertical-align: middle;
+    text-shadow: none;
+    white-space: nowrap;
+}
+
+.tag--initial {
+    background: var(--term-color);
+    color: var(--term-bg);
+}
+
+.tag--optionnel { border-style: dashed; }
+.tag--pret { border-style: dotted; }
+.tag--veteran { box-shadow: var(--glow); }
+.tag--honorifique { border-width: 2px; }
+
+/* --- Panneau de fiche --- */
+.fiche-panneau {
+    border-top: 1px solid var(--term-color);
+    padding-top: 12px;
+}
+
+.fiche-items {
+    list-style: none;
+    padding-left: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.85em;
+}
+
+.fiche-items li {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 1px 0;
+}
+
+.fiche-statut {
+    font-size: 0.8em;
+    min-height: 1.2em;
+    margin-top: 6px;
+    color: var(--term-warn);
+    text-shadow: none;
+}
+
+.vide {
+    color: var(--term-dim);
+    text-shadow: none;
+    font-size: 0.9em;
+}
+
+/* ======================================================================
+   INDEX GENERAL
+   ====================================================================== */
+.index-barre {
+    max-width: 420px;
+    margin: 12px 0 20px;
+}
+
+.index-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.index-table th,
+.index-table td {
+    border: 1px solid var(--term-color);
+    padding: 4px 8px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.index-table th {
+    text-transform: uppercase;
+    font-weight: normal;
+    background: rgba(51, 255, 0, 0.1);
+    position: sticky;
+    top: 0;
+}
+
+.index-table tbody tr:hover {
+    background: rgba(51, 255, 0, 0.08);
+}
+
+.error-msg {
+    color: var(--term-alert);
+    font-size: 0.9em;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* ======================================================================
+   ADAPTATION AUX PETITS ECRANS
+   ====================================================================== */
+@media (max-width: 900px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+        padding: 12px;
+    }
+
+    .terminal {
+        height: auto;
+    }
+
+    main {
+        overflow: visible;
+    }
+
+    .dot-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .dot-filters {
+        position: static;
+        max-height: none;
+    }
+
+    .separator {
+        overflow: hidden;
+    }
+
+    .index-table {
+        display: block;
+        overflow-x: auto;
+    }
+}
+
+/* Respect des preferences d'animation reduite */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+    }
+}
