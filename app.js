@@ -1,6 +1,14 @@
 // ==========================================================================
 // TERMINAL DES DOTATIONS - RETRIBUTORS
 // Architecture reprise du terminal des Forges (Modele / Vue / Controleur)
+//
+// Le referentiel tient en deux tableaux :
+//   FORMATIONS : les Compagnies et corps, avec leurs roles.
+//   ARMURERIE  : un equipement = une seule entree, qui porte la liste des
+//                roles autorises a le percevoir (ses "tags").
+// La vue par role est reconstruite au chargement par construireDotations().
+// Consequence : un nom d'arme n'existe qu'a un seul endroit du fichier, donc
+// aucune divergence d'orthographe possible et aucun doublon dans l'index.
 // ==========================================================================
 
 // --- Echelle des autorites d'autorisation ---
@@ -8,14 +16,16 @@ const AUTORITES = {
     aucune: 0,
     sergent: 1,
     lieutenant: 2,
-    capitaine: 3
+    capitaine: 3,
+    maitre: 4
 };
 
 const AUTORITES_LABEL = {
     aucune: "Aucune",
     sergent: "Sergent",
     lieutenant: "Lieutenant",
-    capitaine: "Capitaine"
+    capitaine: "Capitaine",
+    maitre : "Maitre de Spécialité"
 };
 
 // --- Types de dotation (sert aux filtres, aux tags et a la legende) ---
@@ -50,550 +60,643 @@ const TYPES = {
 const ORDRE_TYPES = ["initial", "optionnel", "pret", "veteran", "honorifique"];
 
 // ==========================================================================
-// DONNEES : REFERENTIEL DES DOTATIONS
-// Chaque objet : { nom, aut (optionnel), note (optionnel) }
+// FORMATIONS : Compagnies, corps de spécialistes et leurs rôles.
+// L'identifiant d'un role est ce que l'armurerie reference.
 // ==========================================================================
-const DOTATIONS = [
-    // ---------------------------------------------------------------- 4e
+const FORMATIONS = [
     {
         id: "c4",
+        code: "4e",
         nav: "4e Compagnie",
         titre: "DOTATIONS - 4E COMPAGNIE",
         intro: "Impulsors, Assauts, Devastators et Vétérans de la Compagnie.",
         note: "Équipement optionnel disponible en permanence sous autorisation d'un Officier de la Compagnie. Les autorisations de Vétéran sont accordées selon les faits d'armes et l'importance au sein de la Compagnie.",
         roles: [
+            { id: "impulsor", nom: "IMPULSOR", court: "Impulsor" },
+            { id: "assaut", nom: "ASSAUT", court: "Assaut" },
+            { id: "devastator", nom: "DEVASTATOR", court: "Devastator" },
             {
-                nom: "IMPULSOR",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse avec bouclier" },
-                            { nom: "Fusil Bolter" },
-                            { nom: "Pistolet Bolter Mk2 avec bouclier" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Carabine Bolter (tous les types)", aut: "sergent" },
-                            { nom: "Fusil Bolter Lourd", aut: "sergent" },
-                            { nom: "Modules (tous les types)", aut: "sergent" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Fusil Melta Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "ASSAUT",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse" },
-                            { nom: "Carabine Bolter" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Jump Pack" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Carabine Bolter (tous les types)", aut: "sergent" },
-                            { nom: "Fusil Bolter Lourd", aut: "sergent" },
-                            { nom: "Fusil Bolter", aut: "sergent" },
-                            { nom: "Pistolet Bolter Lourd Mk2", aut: "sergent" },
-                            { nom: "Modules (tous les types)", aut: "sergent" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Fusil Melta Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "DEVASTATOR",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse" },
-                            { nom: "Bolter Lourd Mk2" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Module de Céramite Lourde" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Pistolet Bolter Lourd Mk2", aut: "sergent" },
-                            { nom: "Modules (tous les types)", aut: "sergent" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Multi Melta Lourd Mk2" },
-                            { nom: "Incinérateur Plasma Lourd Mk2" },
-                            { nom: "Canon Laser Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
+                id: "c4-veteran",
                 nom: "TOUTES SPÉCIALISATIONS // À PARTIR DE VÉTÉRAN",
+                court: "Vétéran",
                 commun: true,
-                sections: [
-                    {
-                        type: "veteran",
-                        titre: "Sur demande, dotation permanente",
-                        items: [
-                            { nom: "Épée Énergétique Mk1", aut: "sergent" },
-                            { nom: "Hache Énergétique Mk1", aut: "sergent" },
-                            { nom: "Thunder Hammer", aut: "capitaine" },
-                            { nom: "Fusil Melta Mk2", aut: "sergent" },
-                            { nom: "Storm Bolter", aut: "lieutenant" }
-                        ]
-                    },
-                    {
-                        type: "honorifique",
-                        titre: "Récompense, dotation permanente",
-                        items: [
-                            { nom: "Pistolet Plasma Mk2", aut: "lieutenant" },
-                            { nom: "Pistolet Inferno", aut: "lieutenant" },
-                            { nom: "Pistolet Neo-Volkite", aut: "lieutenant" },
-                            { nom: "Toutes les armes bouclier", aut: "lieutenant" }
-                        ]
-                    }
-                ]
+                titresSections: {
+                    veteran: "Sur demande, dotation permanente",
+                    honorifique: "Récompense, dotation permanente"
+                }
             }
         ]
     },
-
-    // --------------------------------------------------------------- 10e
     {
         id: "c10",
+        code: "10e",
         nav: "10e Compagnie",
         titre: "DOTATIONS - 10E COMPAGNIE",
         intro: "Néophytes, Frères sans spécialisation, Longstrikes, Incursors et Vétérans.",
         note: "Équipement optionnel laissé à l'appréciation du Frère, sauf mention d'autorisation. Les autorisations de Vétéran sont accordées selon les faits d'armes et l'importance au sein de la Compagnie.",
         roles: [
+            { id: "neophyte", nom: "NÉOPHYTE", court: "Néophyte" },
+            { id: "frere", nom: "FRÈRE DE BATAILLE (SANS SPÉCIALISATION)", court: "Frère de Bataille" },
+            { id: "longstrike", nom: "LONGSTRIKE (TIREUR D'ÉLITE)", court: "Longstrike" },
+            { id: "incursor", nom: "INCURSOR (AVANT-GARDE)", court: "Incursor" },
             {
-                nom: "NÉOPHYTE",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Couteau Astartes" },
-                            { nom: "Bolter Néophyte" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "LongLas", aut: "sergent" },
-                            { nom: "Neo-Shotgun", aut: "sergent" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Plasma Néophyte" },
-                            { nom: "Melta Néophyte" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "FRÈRE DE BATAILLE (SANS SPÉCIALISATION)",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse" },
-                            { nom: "Fusil Bolter" },
-                            { nom: "Pistolet Bolter Mk2" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Couteau Astartes" },
-                            { nom: "Carabine Bolter" },
-                            { nom: "Fusil Bolter Lourd" },
-                            { nom: "Pistolet Bolter Lourd" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Fusil Melta Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "LONGSTRIKE (TIREUR D'ÉLITE)",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse" },
-                            { nom: "Fusil Bolter" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Module de Camouflage" },
-                            { nom: "Grappin Astartes" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Couteau Astartes" },
-                            { nom: "Hache Tronçonneuse" },
-                            { nom: "Carabine Bolter Occulus" },
-                            { nom: "Carabine Bolter Infiltrator" },
-                            { nom: "Carabine Bolter Marksman" },
-                            { nom: "Sniper Bolter" },
-                            { nom: "Lasniper" },
-                            { nom: "Pistolet Bolter Lourd" },
-                            { nom: "Module Céramite Légère" },
-                            { nom: "Module Scanner Tactique" },
-                            { nom: "Module de Vision Nocturne" }
-                        ]
-                    },
-                    {
-                        type: "veteran",
-                        items: [
-                            { nom: "Hache Énergétique", aut: "sergent" },
-                            { nom: "Épée Énergétique", aut: "sergent" },
-                            { nom: "Thunder Hammer", aut: "capitaine" },
-                            { nom: "Pistolet Plasma Mk2", aut: "lieutenant" },
-                            { nom: "Pistolet Neo-Volkite", aut: "lieutenant" },
-                            { nom: "Pistolet Inferno", aut: "lieutenant" },
-                            { nom: "Module Céramite Renforcée", aut: "sergent" },
-                            { nom: "Épée Tronçonneuse Bouclier", aut: "sergent" },
-                            { nom: "Hache Tronçonneuse Bouclier", aut: "sergent" },
-                            { nom: "Épée Énergétique Bouclier", aut: "lieutenant" },
-                            { nom: "Hache Énergétique Bouclier", aut: "lieutenant" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "INCURSOR (AVANT-GARDE)",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Épée tronçonneuse" },
-                            { nom: "Fusil Bolter" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Module de Camouflage" },
-                            { nom: "Grappin Astartes" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Couteau Astartes" },
-                            { nom: "Hache Tronçonneuse" },
-                            { nom: "Fusil Bolter Lourd" },
-                            { nom: "Carabine Bolter" },
-                            { nom: "Carabine Bolter Occulus" },
-                            { nom: "Carabine Bolter Infiltrator" },
-                            { nom: "Carabine Bolter Marksman" },
-                            { nom: "Pistolet Bolter Lourd" },
-                            { nom: "Module Céramite Lourde", aut: "sergent" },
-                            { nom: "Module Céramite Légère" },
-                            { nom: "Module Scanner Tactique" },
-                            { nom: "Module de Vision Nocturne" }
-                        ]
-                    },
-                    {
-                        type: "veteran",
-                        items: [
-                            { nom: "Hache Énergétique", aut: "sergent" },
-                            { nom: "Épée Énergétique", aut: "sergent" },
-                            { nom: "Thunder Hammer", aut: "capitaine" },
-                            { nom: "Storm Bolter", aut: "lieutenant" },
-                            { nom: "Pistolet Plasma Mk2", aut: "lieutenant" },
-                            { nom: "Pistolet Neo-Volkite", aut: "lieutenant" },
-                            { nom: "Pistolet Inferno", aut: "lieutenant" },
-                            { nom: "Épée Énergétique Bouclier", aut: "lieutenant" },
-                            { nom: "Hache Énergétique Bouclier", aut: "lieutenant" },
-                            { nom: "Épée Tronçonneuse Bouclier", aut: "sergent" },
-                            { nom: "Hache Tronçonneuse Bouclier", aut: "sergent" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Fusil Melta Mk2" }
-                        ]
-                    }
-                ]
+                id: "c10-veteran",
+                nom: "TOUTES SPÉCIALISATIONS // À PARTIR DE VÉTÉRAN",
+                court: "Vétéran",
+                commun: true,
+                titresSections: {
+                    veteran: "Sur demande, dotation permanente",
+                    honorifique: "Récompense, dotation permanente"
+                }
             }
         ]
     },
-
-    // -------------------------------------------------------- Apothicaires
     {
         id: "apothicaires",
+        code: "APO",
         nav: "Apothicaires",
         titre: "DOTATIONS - APOTHICARION",
         intro: "Apothicaires des différentes Compagnies.",
         note: "Note des Forges : tout équipement non présent ou non conforme à cette liste dans l'inventaire d'un Frère Apothicaire lui sera confisqué. L'équipement honorifique est décerné par le Maître Apothicaire.",
         roles: [
-            {
-                nom: "APOTHICAIRE NOVICE",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Épée Tronçonneuse Mk1" },
-                            { nom: "Module de Céramite Légère" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Bolter Modèle Godwin" },
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Fusil Bolter Lourd Mk2" },
-                            { nom: "Carabine Bolter (et variantes)" },
-                            { nom: "Hache Tronçonneuse Mk1" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Matériel de spécialité", note: "Selon la mission et le commandant de mission (jump-pack, grappin, etc.). Armes de spécialité exclues." }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "APOTHICAIRE CONFIRMÉ",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Pistolet Bolter Lourd Mk2" },
-                            { nom: "Épée Énergétique Mk1" },
-                            { nom: "Module de Céramite Légère" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Bolter Modèle Godwin" },
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Fusil Bolter Lourd Mk2" },
-                            { nom: "Carabine Bolter (et variantes)" },
-                            { nom: "Pistolet Bolter Mk2" }
-                        ]
-                    },
-                    {
-                        type: "honorifique",
-                        items: [
-                            { nom: "Pistolet Plasma Mk2" },
-                            { nom: "Pistolet Inferno Mk2" },
-                            { nom: "Pistolet Lance-Flamme Mk1" },
-                            { nom: "Pistolet Neo-Volkite" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Matériel de spécialité", note: "Selon la mission et le commandant de mission (jump-pack, grappin, etc.). Armes de spécialité exclues." }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "APOTHICAIRE VÉTÉRAN",
-                limite: "Effectif maximal : 2",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Pistolet Plasma Mk2" },
-                            { nom: "Épée Énergétique Mk1 avec Bouclier Relique" },
-                            { nom: "Module de Céramite Légère" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Bolter Modèle Godwin" },
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Fusil Bolter Lourd Mk2" },
-                            { nom: "Carabine Bolter (et variantes)" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Pistolet Bolter Lourd Mk2" },
-                            { nom: "Pistolet Inferno Mk2" }
-                        ]
-                    },
-                    {
-                        type: "honorifique",
-                        items: [
-                            { nom: "Pistolet Lance-Flamme Mk1" },
-                            { nom: "Pistolet Neo-Volkite" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Matériel de spécialité", note: "Selon la mission et le commandant de mission (jump-pack, grappin, etc.). Armes de spécialité exclues." }
-                        ]
-                    }
-                ]
-            }
+            { id: "apo-novice", nom: "APOTHICAIRE NOVICE", court: "Novice" },
+            { id: "apo-confirme", nom: "APOTHICAIRE CONFIRMÉ", court: "Confirmé" },
+            { id: "apo-veteran", nom: "APOTHICAIRE VÉTÉRAN", court: "Vétéran", limite: "Effectif maximal : 2" }
         ]
     },
-
-    // --------------------------------------------------------- Chapelains
     {
         id: "chapelains",
+        code: "REC",
         nav: "Chapelains",
         titre: "DOTATIONS - RECLUSIAM",
         intro: "Judicars et Chapelains des différentes Compagnies.",
         note: "Note des Forges : tout équipement non présent ou non conforme à cette liste dans l'inventaire d'un Frère Chapelain lui sera confisqué. L'équipement honorifique est décerné par le Réclusiarque.",
         roles: [
-            {
-                nom: "JUDICAR",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Lance-Flamme Mk1" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Épée Énergétique Mk1" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Bolter Modèle Godwin" },
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Fusil Bolter Lourd Mk2" },
-                            { nom: "Carabine Bolter (et variantes)" },
-                            { nom: "Pistolet Bolter Lourd Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "CHAPELAIN",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Lance-Flamme Mk1" },
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Crozius" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Bolter Modèle Godwin" },
-                            { nom: "Fusil Bolter Mk2" },
-                            { nom: "Fusil Bolter Lourd Mk2" },
-                            { nom: "Carabine Bolter (et variantes)" },
-                            { nom: "Pistolet Bolter Lourd Mk2" },
-                            { nom: "Pistolet Plasma Mk2" },
-                            { nom: "Pistolet Inferno Mk2" },
-                            { nom: "Pistolet Lance-Flamme Mk1" }
-                        ]
-                    },
-                    {
-                        type: "honorifique",
-                        items: [
-                            { nom: "Pistolet Neo-Volkite" }
-                        ]
-                    },
-                    {
-                        type: "pret",
-                        items: [
-                            { nom: "Matériel de spécialité", note: "Selon la mission et le commandant de mission (jump-pack, grappin, etc.). Armes de spécialité exclues." }
-                        ]
-                    }
-                ]
-            }
+            { id: "judicar", nom: "JUDICAR", court: "Judicar" },
+            { id: "chapelain", nom: "CHAPELAIN", court: "Chapelain" }
         ]
     },
-
-    // -------------------------------------------------------- Archivistes
     {
         id: "archivistes",
+        code: "LIB",
         nav: "Archivistes",
         titre: "DOTATIONS - LIBRARIUS",
         intro: "Archivistes des différentes Compagnies.",
         note: "Note des Forges : tout équipement non présent ou non conforme à cette liste dans l'inventaire d'un Frère Archiviste lui sera confisqué. L'équipement honorifique est décerné par le Maître Archiviste.",
         roles: [
-            {
-                nom: "INITIÉ",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Pistolet Bolter Mk2" },
-                            { nom: "Épée Tronçonneuse Mk1" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Hache Tronçonneuse Mk1" },
-                            { nom: "Fusil Bolter Mk2" }
-                        ]
-                    }
-                ]
-            },
-            {
-                nom: "ARCHIVISTE CONFIRMÉ",
-                sections: [
-                    {
-                        type: "initial",
-                        items: [
-                            { nom: "Pistolet Bolter Lourd Mk2" },
-                            { nom: "Épée Énergétique Mk1" },
-                            { nom: "Module de Céramite Légère" }
-                        ]
-                    },
-                    {
-                        type: "optionnel",
-                        items: [
-                            { nom: "Hache Énergétique Mk1" },
-                            { nom: "Fusil Bolter Mk2" }
-                        ]
-                    },
-                    {
-                        type: "honorifique",
-                        items: [
-                            { nom: "Pistolet Lance-Flamme Mk1" },
-                            { nom: "Pistolet Plasma Mk2" },
-                            { nom: "Pistolet Inferno Mk2" }
-                        ]
-                    }
-                ]
-            }
+            { id: "arch-initie", nom: "INITIÉ", court: "Initié" },
+            { id: "arch-confirme", nom: "ARCHIVISTE CONFIRMÉ", court: "Confirmé" }
         ]
     }
 ];
+
+// Index des roles : identifiant -> { court, nom, code, formation }
+const ROLES = new Map();
+FORMATIONS.forEach(f => f.roles.forEach(r => ROLES.set(r.id, {
+    court: r.court,
+    nom: r.nom,
+    code: f.code,
+    formationId: f.id,
+    formation: f.nav
+})));
+
+// ==========================================================================
+// ARMURERIE : une entree par equipement, quel que soit le nombre de roles.
+//
+// nom       : libelle unique, tel qu'affiche partout.
+// classe    : famille d'arme, sert au tri et a la recherche.
+// note      : precision affichee sous l'entree (optionnel).
+// dotations : a quel titre les roles y ont droit.
+//             { type: "initial" | "optionnel" | "pret" | "veteran" | "honorifique",
+//               aut: "sergent" | "lieutenant" | "capitaine" (optionnel),
+//               roles: [identifiants de roles] }
+//
+// Pour ajouter une arme : une entree ici. Pour la donner a un role de plus :
+// un identifiant de plus dans le tableau roles concerne.
+// ==========================================================================
+const ARMURERIE = [
+
+    // --- Mêlée ---
+    {
+        nom: "Couteau Astartes",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: ["neophyte"] },
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "impulsor", "devastator", "assaut"] }
+        ]
+    },
+    {
+        nom: "Double Couteau Astartes",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "impulsor", "devastator", "assaut"] }
+        ]
+    },
+    {
+        nom: "Épée Tronçonneuse Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: [
+                "assaut", "devastator", "frere", "longstrike", "incursor", "apo-novice",
+                "arch-initie"
+            ] }
+        ]
+    },
+    {
+        nom: "Double Épée Tronçonneuse Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: [
+                "assaut", "devastator", "frere", "longstrike", "incursor", "apo-novice",
+                "arch-initie"
+            ] }
+        ]
+    },
+    {
+        nom: "Épée Tronçonneuse Lourde Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: [
+                "assaut", "devastator", "frere", "longstrike", "incursor", "apo-novice",
+                "arch-initie"
+            ] }
+        ]
+    },
+    {
+        nom: "Hache Tronçonneuse Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-novice", "arch-initie", "assaut", "devastator", "impulsor"] }
+        ]
+    },
+    {
+        nom: "Hache Tronçonneuse Lourde Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-novice", "arch-initie", "assaut", "devastator", "impulsor"] }
+        ]
+    },
+    {
+        nom: "Double Hache Tronçonneuse Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-novice", "arch-initie", "assaut", "devastator", "impulsor"] }
+        ]
+    },
+    {
+        nom: "Épée Tronçonneuse & Bouclier Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: ["impulsor"] },
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-novice", "arch-initie", "assaut", "devastator"] }
+        ]
+    },
+    {
+        nom: "Hache Tronçonneuse & Bouclier Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-novice", "arch-initie", "assaut", "devastator", "impulsor"] }
+        ]
+    },
+    {
+        nom: "Épée Énergétique Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: ["apo-confirme", "arch-confirme"] },
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Épée Énergétique Lourde Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: ["apo-confirme", "judicar", "arch-confirme"] },
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran"] },
+            { type: "veteran", aut: "capitaine", roles: ["c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Hache Énergétique Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["arch-confirme"] },
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Hache Énergétique Lourde Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", roles: ["arch-confirme"] },
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran"] },
+            { type: "veteran", aut: "capitaine", roles: ["c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Épée Énergétique & Bouclier Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran"] },
+            { type: "veteran", aut: "capitaine", roles: ["c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Hache Énergétique & Bouclier Mk I",
+        classe: "Mêlée",
+        dotations: [
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran"] },
+            { type: "veteran", aut: "capitaine", roles: ["c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Thunder Hammer",
+        classe: "Mêlée",
+        dotations: [
+            { type: "veteran", aut: "capitaine", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Crozius",
+        classe: "Mêlée",
+        dotations: [
+            { type: "initial", roles: ["chapelain"] }
+        ]
+    },
+        {
+        nom: "Crozius & Bouclier",
+        classe: "Mêlée",
+        dotations: [
+            { type: "optionnel", aut: "maitre", roles: ["chapelain"] }
+        ]
+    },
+
+    // --- Bolter ---
+    {
+        nom: "Fusil Bolter Mk II",
+        classe: "Bolter",
+        dotations: [
+            { type: "initial", roles: [
+                "impulsor", "frere", "incursor", "apo-novice", "apo-confirme",
+                "apo-veteran"
+            ] },
+            { type: "optionnel", roles: ["judicar", "chapelain", "arch-initie", "arch-confirme"] },
+            { type: "optionnel", roles: ["assaut"] }
+        ]
+    },
+    {
+        nom: "Fusil Bolter Lourd Mk II",
+        classe: "Bolter",
+        dotations: [
+            { type: "optionnel", roles: [
+                "frere", "incursor", "apo-novice", "apo-confirme", "apo-veteran", "judicar",
+                "chapelain"
+            ] },
+            { type: "optionnel", roles: ["impulsor", "assaut"] }
+        ]
+    },
+    {
+        nom: "Bolter Lourd Mk II",
+        classe: "Bolter",
+        dotations: [
+            { type: "initial", roles: ["devastator"] }
+        ]
+    },
+    {
+        nom: "Bolter Modèle Godwin",
+        classe: "Bolter",
+        dotations: [
+            { type: "optionnel", roles: ["apo-novice", "apo-confirme", "apo-veteran", "judicar", "chapelain"] }
+        ]
+    },
+    {
+        nom: "Bolter Néophyte",
+        classe: "Bolter",
+        dotations: [
+            { type: "initial", roles: ["neophyte"] }
+        ]
+    },
+    {
+        nom: "Storm Bolter",
+        classe: "Bolter",
+        dotations: [
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] },
+            { type: "optionnel", aut: "maitre", roles: ["chapelain"]}
+        ]
+    },
+    {
+        nom: "Sniper Bolter",
+        classe: "Bolter",
+        dotations: [
+            { type: "initial", roles: ["longstrike"] },
+        ]
+    },
+
+    // --- Carabine ---
+    {
+        nom: "Carabine Bolter Standart Mk II",
+        classe: "Carabine",
+        dotations: [
+            { type: "initial", roles: ["assaut"] },
+            { type: "optionnel", roles: [
+                "frere", "incursor", "apo-novice", "apo-confirme", "apo-veteran", "judicar",
+                "chapelain"
+            ] },
+            { type: "optionnel", roles: ["impulsor"] }
+        ]
+    },
+    {
+        nom: "Carabine Bolter Marksman Mk II",
+        classe: "Carabine",
+        dotations: [
+            { type: "optionnel", roles: [
+                "longstrike", "incursor", "apo-novice", "apo-confirme", "apo-veteran",
+                "judicar", "chapelain"
+            ] },
+            { type: "optionnel", roles: ["impulsor", "assaut"] }
+        ]
+    },
+    {
+        nom: "Carabine Bolter Infiltrator Mk II",
+        classe: "Carabine",
+        dotations: [
+            { type: "optionnel", roles: [
+                "longstrike", "incursor", "apo-novice", "apo-confirme", "apo-veteran",
+                "judicar", "chapelain"
+            ] },
+            { type: "optionnel", roles: ["impulsor", "assaut"] }
+        ]
+    },
+    {
+        nom: "Carabine Bolter Oculus Mk II",
+        classe: "Carabine",
+        dotations: [
+            { type: "optionnel", roles: [
+                "longstrike", "incursor", "apo-novice", "apo-confirme", "apo-veteran",
+                "judicar", "chapelain"
+            ] },
+            { type: "optionnel", roles: ["impulsor", "assaut"] }
+        ]
+    },
+
+    // --- Pistolet ---
+    {
+        nom: "Pistolet Bolter Mk II",
+        classe: "Pistolet",
+        dotations: [
+            { type: "initial", roles: [
+                "assaut", "devastator", "frere", "longstrike", "incursor", "apo-novice",
+                "judicar", "chapelain", "arch-initie"
+            ] },
+            { type: "optionnel", roles: ["apo-confirme", "apo-veteran"] }
+        ]
+    },
+    {
+        nom: "Pistolet Bolter Lourd Mk II",
+        classe: "Pistolet",
+        dotations: [
+            { type: "initial", roles: ["apo-confirme", "arch-confirme"] },
+            { type: "optionnel", roles: ["frere", "longstrike", "incursor", "apo-veteran", "judicar", "chapelain"] },
+            { type: "optionnel", roles: ["assaut", "devastator"] }
+        ]
+    },
+    {
+        nom: "Pistolet Bolter Bouclier Mk II",
+        classe: "Pistolet",
+        dotations: [
+            { type: "initial", roles: ["impulsor"] }
+        ]
+    },
+    {
+        nom: "Pistolet Plasma Mk II",
+        classe: "Pistolet",
+        dotations: [
+            { type: "initial", roles: ["apo-veteran"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain"] },
+            { type: "honorifique", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Pistolet Inferno Mk II",
+        classe: "Pistolet",
+        dotations: [
+            { type: "optionnel", roles: ["apo-veteran", "chapelain"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain"] },
+            { type: "honorifique", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Pistolet Neo-Volkite",
+        classe: "Pistolet",
+        dotations: [
+            { type: "veteran", aut: "lieutenant", roles: ["longstrike", "incursor"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "apo-veteran", "chapelain"] },
+            { type: "honorifique", aut: "capitaine", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Pistolet Lance-Flamme Mk I",
+        classe: "Pistolet",
+        dotations: [
+            { type: "optionnel", roles: ["chapelain"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "apo-veteran", "arch-confirme"] },
+            { type: "honorifique", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+
+    // --- Arme spéciale ---
+    {
+        nom: "Fusil Melta Mk II",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "pret", roles: ["impulsor", "assaut", "frere", "incursor"] },
+            { type: "veteran", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
+        ]
+    },
+    {
+        nom: "Lance-Flamme Mk I",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "initial", roles: ["judicar", "chapelain"] },
+            { type: "pret", roles: ["impulsor", "assaut", "frere", "incursor"] }
+        ]
+    },
+    {
+        nom: "Plasma Néophyte",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "pret", roles: ["neophyte"] }
+        ]
+    },
+    {
+        nom: "Melta Néophyte",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "pret", roles: ["neophyte"] }
+        ]
+    },
+    {
+        nom: "Neo-Shotgun",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "optionnel", aut: "sergent", roles: ["neophyte"] }
+        ]
+    },
+    {
+        nom: "LongLas",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "optionnel", aut: "sergent", roles: ["neophyte"] }
+        ]
+    },
+    {
+        nom: "LasSniper",
+        classe: "Arme spéciale",
+        dotations: [
+            { type: "optionnel", aut: "sergent", roles: ["longstrike"] }
+        ]
+    },
+
+    // --- Arme lourde ---
+    {
+        nom: "Multi Melta Lourd Mk II",
+        classe: "Arme lourde",
+        dotations: [
+            { type: "pret", roles: ["devastator"] }
+        ]
+    },
+    {
+        nom: "Incinérateur Plasma Lourd Mk II",
+        classe: "Arme lourde",
+        dotations: [
+            { type: "pret", roles: ["devastator"] }
+        ]
+    },
+    {
+        nom: "Canon Laser Mk II",
+        classe: "Arme lourde",
+        dotations: [
+            { type: "pret", roles: ["devastator"] }
+        ]
+    },
+
+    // --- Module ---
+    {
+        nom: "Module de Céramite Lourde",
+        classe: "Module",
+        dotations: [
+            { type: "initial", roles: ["devastator"] },
+            { type: "optionnel", aut: "sergent", roles: ["impulsor", "assaut", "incursor", "longstrike"] }
+        ]
+    },
+    {
+        nom: "Module de Céramite Légère",
+        classe: "Module",
+        dotations: [
+            { type: "initial", roles: ["apo-novice", "apo-confirme", "apo-veteran", "arch-confirme"] },
+            { type: "optionnel", aut: "sergent", roles: ["impulsor", "assaut", "devastator", "longstrike", "incursor"] }
+        ]
+    },
+    {
+        nom: "Module de Vision Nocturne",
+        classe: "Module",
+        dotations: [
+            { type: "optionnel", aut: "sergent", roles: ["impulsor", "assaut", "devastator", "longstrike", "incursor"] }
+        ]
+    },
+    {
+        nom: "Module de Camouflage",
+        classe: "Module",
+        dotations: [
+            { type: "initial", roles: ["longstrike", "incursor"] }
+        ]
+    },
+    {
+        nom: "Module de Scanner Tactique",
+        classe: "Module",
+        dotations: [
+            { type: "optionnel", aut: "sergent", roles: ["longstrike", "incursor"] }
+        ]
+    },
+
+    // --- Équipement ---
+    {
+        nom: "Jump Pack",
+        classe: "Équipement",
+        dotations: [
+            { type: "initial", roles: ["assaut"] }
+        ]
+    },
+    {
+        nom: "Grappin Astartes",
+        classe: "Équipement",
+        dotations: [
+            { type: "initial", roles: ["longstrike", "incursor"] }
+        ]
+    },
+    {
+        nom: "Matériel de spécialité",
+        classe: "Équipement",
+        note: "Selon la mission et le commandant de mission (jump-pack, grappin, etc.). Armes de spécialité exclues.",
+        dotations: [
+            { type: "pret", roles: ["apo-novice", "apo-confirme", "apo-veteran", "chapelain"] }
+        ]
+    },
+];
+
+// ==========================================================================
+// RECONSTRUCTION DE LA VUE PAR ROLE
+// L'armurerie est organisee par equipement, l'affichage par role : on
+// retourne la table une fois au chargement.
+// ==========================================================================
+function construireDotations() {
+    const parRole = new Map();
+    ROLES.forEach((infos, id) => parRole.set(id, new Map()));
+
+    ARMURERIE.forEach(item => {
+        item.dotations.forEach(dot => {
+            dot.roles.forEach(rid => {
+                const sections = parRole.get(rid);
+                if (!sections) {
+                    console.warn("Rôle inconnu dans l'armurerie : " + rid + " (" + item.nom + ")");
+                    return;
+                }
+                if (!sections.has(dot.type)) sections.set(dot.type, []);
+                const entree = { nom: item.nom, classe: item.classe };
+                if (dot.aut) entree.aut = dot.aut;
+                if (item.note) entree.note = item.note;
+                sections.get(dot.type).push(entree);
+            });
+        });
+    });
+
+    return FORMATIONS.map(f => ({
+        id: f.id,
+        code: f.code,
+        nav: f.nav,
+        titre: f.titre,
+        intro: f.intro,
+        note: f.note,
+        roles: f.roles.map(r => {
+            const sections = parRole.get(r.id);
+            return {
+                id: r.id,
+                nom: r.nom,
+                court: r.court,
+                commun: r.commun,
+                limite: r.limite,
+                sections: ORDRE_TYPES
+                    .filter(t => sections.has(t))
+                    .map(t => ({
+                        type: t,
+                        titre: r.titresSections ? r.titresSections[t] : undefined,
+                        items: sections.get(t)
+                    }))
+            };
+        })
+    }));
+}
+
+const DOTATIONS = construireDotations();
 
 // ==========================================================================
 // OUTILS
@@ -616,6 +719,32 @@ function norm(txt) {
         .replace(/[\u0300-\u036f]/g, "");
 }
 
+// Controle de coherence du referentiel. A lancer dans la console apres une
+// modification : auditReferentiel().
+function auditReferentiel() {
+    const inconnus = [];
+    const servis = new Set();
+
+    ARMURERIE.forEach(item => {
+        if (!item.dotations || item.dotations.length === 0) {
+            inconnus.push("Équipement sans dotation : " + item.nom);
+        }
+        (item.dotations || []).forEach(dot => dot.roles.forEach(rid => {
+            if (!ROLES.has(rid)) inconnus.push("Rôle inconnu : " + rid + " (" + item.nom + ")");
+            else servis.add(rid);
+        }));
+    });
+
+    ROLES.forEach((infos, id) => {
+        if (!servis.has(id)) inconnus.push("Rôle sans équipement : " + id);
+    });
+
+    console.log("Équipements : " + ARMURERIE.length + " | Rôles : " + ROLES.size);
+    if (inconnus.length === 0) console.log("Référentiel cohérent.");
+    else inconnus.forEach(l => console.warn(l));
+    return inconnus;
+}
+
 // ==========================================================================
 // MODELE (Donnees + etat de l'interface)
 // ==========================================================================
@@ -633,10 +762,12 @@ class DataModel {
                 veteran: true,
                 honorifique: true
             },
+            formations: {},             // utilise par l'index general
             autorite: "capitaine",      // autorite maximale dont dispose le Frere
             masquerVerrouille: false,   // masquer plutot que griser les entrees hors portee
             recherche: ""
         };
+        FORMATIONS.forEach(f => { this.filtres.formations[f.id] = true; });
 
         // Roles masques : cle "categorieId|nomDuRole"
         this.rolesMasques = new Set();
@@ -689,7 +820,7 @@ class DataModel {
 
                 const entrees = [];
                 section.items.forEach(item => {
-                    if (q !== "" && !roleCorrespond && !norm(item.nom).includes(q)) return;
+                    if (q !== "" && !roleCorrespond && !norm(item.nom).includes(q) && !norm(item.classe || "").includes(q)) return;
 
                     const verrouille = this.estVerrouille(item);
                     if (verrouille && this.filtres.masquerVerrouille) return;
@@ -714,25 +845,43 @@ class DataModel {
         return resultat;
     }
 
-    // Index global : un objet par occurrence d'equipement dans le referentiel
+    // Index general : une ligne par equipement, filtree par la recherche,
+    // les types de dotation actifs et les formations cochees.
     indexGlobal() {
+        const q = norm(this.filtres.recherche.trim());
         const lignes = [];
-        this.categories.forEach(cat => {
-            cat.roles.forEach(role => {
-                role.sections.forEach(section => {
-                    section.items.forEach(item => {
-                        lignes.push({
-                            nom: item.nom,
-                            categorie: cat.nav,
-                            role: role.nom,
-                            type: section.type,
-                            aut: item.aut || null
-                        });
-                    });
+
+        ARMURERIE.forEach(item => {
+            const acces = [];
+
+            item.dotations.forEach(dot => {
+                if (!this.filtres.types[dot.type]) return;
+
+                const roles = dot.roles.filter(rid => {
+                    const infos = ROLES.get(rid);
+                    return infos && this.filtres.formations[infos.formationId];
                 });
+                if (roles.length === 0) return;
+
+                acces.push({ type: dot.type, aut: dot.aut || null, roles: roles });
             });
+
+            if (acces.length === 0) return;
+
+            if (q !== "") {
+                const cible = [item.nom, item.classe].concat(
+                    acces.reduce((liste, a) => liste.concat(a.roles.map(rid => {
+                        const infos = ROLES.get(rid);
+                        return infos.court + " " + infos.nom + " " + infos.formation;
+                    })), [])
+                ).join(" ");
+                if (!norm(cible).includes(q)) return;
+            }
+
+            lignes.push({ nom: item.nom, classe: item.classe, acces: acces });
         });
-        return lignes.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+
+        return lignes;
     }
 
     basculerFiche(cle, actif, infos) {
@@ -827,7 +976,7 @@ class AppView {
         this.appRoot.innerHTML = `
             <h2>&gt; REGISTRE DES DOTATIONS DU CHAPITRE</h2>
             <p>&gt; [BASE DE DONNÉES] : SYNCHRONISÉE.</p>
-            <p>&gt; [DERNIÈRE COLLATION] : CYCLE STANDARD EN COURS.</p>
+            <p>&gt; [PIÈCES RÉPERTORIÉES] : ${ARMURERIE.length}.</p>
             <p>&gt; [AUTORITÉ DE RÉDACTION] : FORGES DES RETRIBUTORS.</p>
             <br>
 
@@ -837,7 +986,7 @@ class AppView {
                 <li>Les cases de la colonne de gauche filtrent l'affichage par type de dotation et par rôle.</li>
                 <li>Le sélecteur d'autorité grise les entrées qui dépassent l'autorisation dont tu disposes.</li>
                 <li>Coche une entrée dans la liste pour la verser à la fiche de dotation, copiable en un clic.</li>
-                <li>L'index général permet de rechercher un équipement et de voir qui a le droit de le porter.</li>
+                <li>L'index général liste chaque pièce une seule fois, avec les rôles qui peuvent la percevoir.</li>
             </ul>
             <br>
 
@@ -872,15 +1021,17 @@ class AppView {
         `;
     }
 
-    htmlFiltres(model, cat) {
-        const cases = ORDRE_TYPES.map(t => `
+    htmlCasesTypes(model) {
+        return ORDRE_TYPES.map(t => `
             <label class="chk">
                 <input type="checkbox" data-filtre-type="${t}" ${model.filtres.types[t] ? "checked" : ""}>
                 <span class="box"></span>
                 <span class="tag tag--${t}">${TYPES[t].court}</span> ${TYPES[t].label}
             </label>
         `).join("");
+    }
 
+    htmlFiltres(model, cat) {
         const roles = cat.roles.map(role => `
             <label class="chk">
                 <input type="checkbox" data-filtre-role="${esc(role.nom)}" ${model.roleMasque(cat.id, role) ? "" : "checked"}>
@@ -896,12 +1047,12 @@ class AppView {
             <div class="filtre-groupe">
                 <h3>&gt; RECHERCHE</h3>
                 <input type="text" id="filtre-recherche" class="champ" autocomplete="off"
-                       placeholder="Nom d'équipement ou de rôle" value="${esc(model.filtres.recherche)}">
+                       placeholder="Équipement, classe ou rôle" value="${esc(model.filtres.recherche)}">
             </div>
 
             <div class="filtre-groupe">
                 <h3>&gt; TYPE DE DOTATION</h3>
-                ${cases}
+                ${this.htmlCasesTypes(model)}
             </div>
 
             <div class="filtre-groupe">
@@ -961,7 +1112,7 @@ class AppView {
                     const item = entree.item;
                     const coche = model.fiche.has(entree.cle) ? "checked" : "";
                     const badge = item.aut
-                        ? `<span class="auth${entree.verrouille ? " auth--verrou" : ""}">AUT. ${AUTORITES_LABEL[item.aut].toUpperCase()}</span>`
+                        ? `<span class="auth${entree.verrouille ? " auth--verrou" : ""}">AUT. PAR ${AUTORITES_LABEL[item.aut].toUpperCase()}</span>`
                         : "";
                     const note = item.note ? `<span class="item-note">${esc(item.note)}</span>` : "";
 
@@ -1005,49 +1156,75 @@ class AppView {
 
     // ------------------------------------------------------ Index general
     renderIndex(model) {
+        const formations = FORMATIONS.map(f => `
+            <label class="chk">
+                <input type="checkbox" data-filtre-formation="${f.id}" ${model.filtres.formations[f.id] ? "checked" : ""}>
+                <span class="box"></span> ${esc(f.nav)}
+            </label>
+        `).join("");
+
         this.appRoot.innerHTML = `
             <h2>&gt; INDEX GÉNÉRAL DE L'ARMURERIE</h2>
-            <p class="dot-intro">Recherche un équipement pour savoir quelle formation peut le percevoir, à quel titre et sous quelle autorisation.</p>
-            <div class="index-barre">
-                <input type="text" id="index-recherche" class="champ" autocomplete="off"
-                       placeholder="Ex : melta, bouclier, céramite" value="${esc(model.filtres.recherche)}">
+            <p class="dot-intro">Une ligne par pièce d'équipement. Les tags indiquent quel rôle peut la percevoir et à quel titre.</p>
+            <div class="filtre-barre">
+                <div class="colonne colonne--large">
+                    <h3>&gt; RECHERCHE</h3>
+                    <input type="text" id="index-recherche" class="champ" autocomplete="off"
+                           placeholder="Ex : melta, bouclier, module, incursor" value="${esc(model.filtres.recherche)}">
+                </div>
+                <div class="colonne">
+                    <h3>&gt; TYPE DE DOTATION</h3>
+                    ${this.htmlCasesTypes(model)}
+                </div>
+                <div class="colonne">
+                    <h3>&gt; FORMATION</h3>
+                    ${formations}
+                </div>
             </div>
             <div id="index-resultats">${this.htmlIndex(model)}</div>
         `;
     }
 
     htmlIndex(model) {
-        const q = norm(model.filtres.recherche.trim());
-        let lignes = model.indexGlobal();
-
-        if (q !== "") {
-            lignes = lignes.filter(l => norm(l.nom).includes(q) || norm(l.role).includes(q) || norm(l.categorie).includes(q));
-        }
+        const lignes = model.indexGlobal();
 
         if (lignes.length === 0) {
             return `<p class="vide">&gt; AUCUNE OCCURRENCE DANS LE REGISTRE.</p>`;
         }
 
-        const corps = lignes.map(l => `
-            <tr>
-                <td>${esc(l.nom)}</td>
-                <td>${esc(l.categorie)}</td>
-                <td>${esc(l.role)}</td>
-                <td><span class="tag tag--${l.type}">${TYPES[l.type].court}</span></td>
-                <td>${l.aut ? esc(AUTORITES_LABEL[l.aut]) : "-"}</td>
-            </tr>
-        `).join("");
+        const corps = lignes.map(ligne => {
+            const acces = ligne.acces.map(a => {
+                const chips = a.roles.map(rid => {
+                    const infos = ROLES.get(rid);
+                    return `<span class="chip" title="${esc(infos.formation)} - ${esc(infos.nom)}"><span class="chip-form">${esc(infos.code)}</span>${esc(infos.court)}</span>`;
+                }).join("");
+                const aut = a.aut ? `<span class="auth">AUT. PAR ${AUTORITES_LABEL[a.aut].toUpperCase()}</span>` : "";
+                return `
+                    <div class="acces-bloc">
+                        <span class="tag tag--${a.type}">${TYPES[a.type].court}</span>
+                        <span class="acces-roles">${chips}</span>
+                        ${aut}
+                    </div>
+                `;
+            }).join("");
+
+            return `
+                <tr>
+                    <td>${esc(ligne.nom)}</td>
+                    <td>${esc(ligne.classe || "-")}</td>
+                    <td>${acces}</td>
+                </tr>
+            `;
+        }).join("");
 
         return `
-            <p class="compteur-global">&gt; ${lignes.length} occurrences répertoriées.</p>
+            <p class="compteur-global">&gt; ${lignes.length} pièces sur ${ARMURERIE.length} répertoriées.</p>
             <table class="index-table">
                 <thead>
                     <tr>
                         <th>Équipement</th>
-                        <th>Formation</th>
-                        <th>Rôle</th>
-                        <th>Type</th>
-                        <th>Autorisation</th>
+                        <th>Classe</th>
+                        <th>Accès</th>
                     </tr>
                 </thead>
                 <tbody>${corps}</tbody>
@@ -1092,16 +1269,17 @@ class AppController {
         return this.model.getCategorie(this.model.currentView);
     }
 
-    // Ne redessine que la zone de resultats (le focus du champ de recherche est conserve)
-    rafraichirResultats() {
+    // Ne redessine que la zone de resultats de la page courante, pour que le
+    // focus et l'etat des filtres soient conserves.
+    rafraichir() {
         const cat = this.catCourante();
-        const zone = document.getElementById("dot-results");
-        if (cat && zone) zone.innerHTML = this.view.htmlResultats(this.model, cat);
-    }
-
-    rafraichirIndex() {
-        const zone = document.getElementById("index-resultats");
-        if (zone) zone.innerHTML = this.view.htmlIndex(this.model);
+        const zoneDot = document.getElementById("dot-results");
+        if (cat && zoneDot) {
+            zoneDot.innerHTML = this.view.htmlResultats(this.model, cat);
+            return;
+        }
+        const zoneIndex = document.getElementById("index-resultats");
+        if (zoneIndex) zoneIndex.innerHTML = this.view.htmlIndex(this.model);
     }
 
     rafraichirFiche() {
@@ -1117,7 +1295,14 @@ class AppController {
         // Filtres par type de dotation
         if (el.dataset.filtreType) {
             this.model.filtres.types[el.dataset.filtreType] = el.checked;
-            this.rafraichirResultats();
+            this.rafraichir();
+            return;
+        }
+
+        // Filtres par formation (index general)
+        if (el.dataset.filtreFormation) {
+            this.model.filtres.formations[el.dataset.filtreFormation] = el.checked;
+            this.rafraichir();
             return;
         }
 
@@ -1125,21 +1310,21 @@ class AppController {
         if (el.dataset.filtreRole) {
             const cat = this.catCourante();
             if (cat) this.model.basculerRole(cat.id, el.dataset.filtreRole, el.checked);
-            this.rafraichirResultats();
+            this.rafraichir();
             return;
         }
 
         // Autorite disponible
         if (el.id === "filtre-autorite") {
             this.model.filtres.autorite = el.value;
-            this.rafraichirResultats();
+            this.rafraichir();
             return;
         }
 
         // Masquage des entrees hors portee
         if (el.id === "filtre-verrouille") {
             this.model.filtres.masquerVerrouille = el.checked;
-            this.rafraichirResultats();
+            this.rafraichir();
             return;
         }
 
@@ -1157,13 +1342,9 @@ class AppController {
     }
 
     onInput(e) {
-        if (e.target.id === "filtre-recherche") {
+        if (e.target.id === "filtre-recherche" || e.target.id === "index-recherche") {
             this.model.filtres.recherche = e.target.value;
-            this.rafraichirResultats();
-        }
-        if (e.target.id === "index-recherche") {
-            this.model.filtres.recherche = e.target.value;
-            this.rafraichirIndex();
+            this.rafraichir();
         }
     }
 
@@ -1186,7 +1367,7 @@ class AppController {
         if (el.id === "btn-fiche-vider") {
             this.model.viderFiche();
             this.rafraichirFiche();
-            this.rafraichirResultats();
+            this.rafraichir();
             this.statutFiche("Fiche vidée.");
             return;
         }
