@@ -411,31 +411,102 @@ select.champ option {
 /* ======================================================================
    INDEX GENERAL
    ====================================================================== */
-.index-barre {
-    max-width: 420px;
+.filtre-barre {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 25px;
+    border: 1px solid var(--term-color);
+    padding: 12px 15px;
     margin: 12px 0 20px;
 }
 
+.filtre-barre .colonne {
+    min-width: 210px;
+}
+
+.filtre-barre .colonne--large {
+    flex: 1;
+    min-width: 260px;
+}
+
+.filtre-barre h3 {
+    font-size: 0.85em;
+    border-bottom: 1px dashed var(--term-color);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+}
+
+/* Tag de role dans la colonne Acces de l'index */
+.chip {
+    display: inline-block;
+    border: 1px solid var(--term-dim);
+    padding: 0 6px;
+    margin: 1px 3px 1px 0;
+    font-size: 0.8em;
+    white-space: nowrap;
+    text-shadow: none;
+    cursor: help;
+}
+
+.chip-form {
+    opacity: 0.6;
+    margin-right: 5px;
+}
+
+.acces-bloc {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 2px 0;
+}
+
+.acces-bloc + .acces-bloc {
+    border-top: 1px dotted var(--term-dim);
+}
+
+.acces-roles {
+    flex: 1;
+}
+
+/* border-collapse: separate obligatoire ici : avec collapse, les bordures
+   appartiennent au tableau et ne suivent pas l'en-tete en position sticky. */
 .index-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.9em;
 }
 
 .index-table th,
 .index-table td {
-    border: 1px solid var(--term-color);
-    padding: 4px 8px;
+    border-right: 1px solid var(--term-color);
+    border-bottom: 1px solid var(--term-color);
+    padding: 5px 8px;
     text-align: left;
-    vertical-align: middle;
+    vertical-align: top;
 }
 
-.index-table th {
+/* Équipement et classe restent compacts, la colonne Accès prend le reste */
+.index-table td:first-child { width: 22%; }
+.index-table td:nth-child(2) { width: 12%; }
+
+.index-table th:first-child,
+.index-table td:first-child {
+    border-left: 1px solid var(--term-color);
+}
+
+.index-table thead th {
     text-transform: uppercase;
     font-weight: normal;
-    background: rgba(51, 255, 0, 0.1);
+    border-top: 1px solid var(--term-color);
     position: sticky;
     top: 0;
+    /* z-index 1 : passe au-dessus des lignes, mais reste sous le voile CRT (z-index 2) */
+    z-index: 1;
+    /* Fond opaque : sinon les lignes defilent en transparence sous l'en-tete */
+    background-color: var(--term-bg);
+    background-image: linear-gradient(rgba(51, 255, 0, 0.12), rgba(51, 255, 0, 0.12));
 }
 
 .index-table tbody tr:hover {
