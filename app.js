@@ -470,8 +470,7 @@ const ARMURERIE = [
         nom: "Pistolet Plasma Mk II",
         classe: "Pistolet",
         dotations: [
-            { type: "initial", roles: ["apo-veteran"] },
-            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain", "apo-veteran"] },
             { type: "honorifique", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
         ]
     },
@@ -479,8 +478,7 @@ const ARMURERIE = [
         nom: "Pistolet Inferno Mk II",
         classe: "Pistolet",
         dotations: [
-            { type: "optionnel", roles: ["apo-veteran", "chapelain"] },
-            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain"] },
+            { type: "optionnel", aut: "maitre", roles: ["apo-confirme", "arch-confirme", "chapelain", "apo-veteran"] },
             { type: "honorifique", aut: "lieutenant", roles: ["c4-veteran", "c10-veteran"] }
         ]
     },
