@@ -515,7 +515,7 @@ const ARMURERIE = [
         classe: "Arme spéciale",
         dotations: [
             { type: "initial", roles: ["judicar", "chapelain"] },
-            { type: "pret", roles: ["impulsor", "assaut", "frere", "incursor"] }
+            { type: "pret", roles: ["impulsor", "assaut"] }
         ]
     },
     {
